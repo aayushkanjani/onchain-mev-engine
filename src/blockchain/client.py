@@ -31,3 +31,21 @@ class EthereumClient:
 
     def latest_block(self) -> int:
         return self.w3.eth.block_number
+    
+    def get_block(self, block_number: int):
+        return self.w3.eth.get_block(
+            block_number,
+            full_transactions=True,
+        )
+
+    def get_transaction(self, tx_hash: str):
+        return self.w3.eth.get_transaction(tx_hash)
+
+    def get_transaction_receipt(self, tx_hash: str):
+        return self.w3.eth.get_transaction_receipt(tx_hash)
+
+    def get_logs(self, from_block: int, to_block: int):
+        return self.w3.eth.get_logs({
+            "fromBlock": from_block,
+            "toBlock": to_block,
+        })  
