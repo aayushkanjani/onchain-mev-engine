@@ -1,10 +1,12 @@
 [project]
 name = "onchain-mev-engine"
 version = "0.1.0"
-description = "Research and simulation infrastructure for on-chain arbitrage and MEV"
-requires-python = ">=3.11"
-
-dependencies = []
+description = "Research-grade DeFi and MEV trading engine"
+requires-python = ">=3.13"
+dependencies = [
+    "web3>=7.0",
+    "python-dotenv>=1.0",
+]
 
 [project.optional-dependencies]
 dev = [
