@@ -1,0 +1,16 @@
+[project]
+name = "onchain-mev-engine"
+version = "0.1.0"
+description = "Research and simulation infrastructure for on-chain arbitrage and MEV"
+requires-python = ">=3.11"
+
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
