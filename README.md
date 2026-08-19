@@ -1,170 +1,156 @@
 # On-Chain MEV Engine
 
-A research-oriented MEV and DeFi trading system built from scratch.
+A research project for understanding and building an on-chain MEV engine from first principles.
 
-The goal is to understand how real on-chain trading infrastructure works — from
-reading Ethereum state and decoding transactions to AMM pricing, arbitrage,
-MEV detection, and eventually transaction-level execution analysis.
+The project starts with AMM mathematics and gradually connects the simulator to real Ethereum and Uniswap state.
 
-This project is intentionally built incrementally, starting with the underlying
-mathematics and gradually connecting it to real Ethereum data.
+The goal is to move from:
+
+    AMM mathematics
+          ↓
+    Arbitrage simulation
+          ↓
+    Real Ethereum data
+          ↓
+    Real Uniswap state
+          ↓
+    V3 concentrated liquidity
+          ↓
+    Cross-pool arbitrage
+          ↓
+    MEV opportunity detection
 
 ---
 
 ## Current Progress
 
-### Milestone 1 — AMM & Arbitrage Engine
+### Milestone 1 — AMM & Arbitrage
 
-Built a constant-product AMM based on:
+Built a constant-product AMM using:
 
     x * y = k
 
 Implemented:
 
-- Constant-product pricing
-- AMM trading fees
-- Swap simulation
-- Spot price calculation
-- Price impact
+- AMM reserves
+- Spot price
+- Trading fees
+- Swap calculations
+- Pool state updates
 - Arbitrage simulation
-- Arbitrage profit calculation
-- Trade-size experiments
+- Arbitrage PnL
+- Trade-size optimization
 - Unit tests
+
+The engine can simulate arbitrage between two AMMs and determine whether a trade is profitable.
 
 ---
 
 ### Milestone 2 — Ethereum Connectivity
 
-Connected the system to Ethereum through an RPC endpoint.
+Connected the engine to a real Ethereum RPC.
 
 Implemented:
 
 - Ethereum RPC client
 - Latest block retrieval
-- Block metadata
+- Block inspection
 - Transaction retrieval
 - Transaction receipts
 - Event logs
+- ERC-20 Transfer decoding
+- Token decimal conversion
+
+The engine can now inspect real Ethereum transactions instead of relying only on simulated data.
 
 ---
 
-### Milestone 3 — On-Chain Transaction Decoding
+### Milestone 3 — Real Uniswap State
 
-Built transaction-level inspection and ERC-20 event decoding.
+Connected directly to Uniswap contracts on Ethereum.
 
 Implemented:
 
-- Transaction inspection
-- Receipt inspection
-- Log parsing
-- ERC-20 `Transfer` event decoding
-- Raw token amount decoding
-- Token decimal normalization
+### Uniswap V2
 
-Example:
+- Factory lookup
+- Pair discovery
+- Token identification
+- Real reserves
+- Spot price calculation
+- Real pool state
+- Swap simulation using real reserves
 
-    Raw amount: 149265000
-    USDC amount: 149.265
+### Uniswap V3
 
----
+Connected to the WETH/USDC 0.05% pool:
 
-### Milestone 4 — Real Uniswap V2 State
+    0x88e6A0c2dDD26FEEb64F039a2c41296FcB3f5640
 
-Connected the AMM engine to a real Uniswap V2 pool.
+Implemented retrieval of:
 
-The system now:
+- `slot0`
+- `sqrtPriceX96`
+- Current tick
+- Active liquidity
+- Pool fee
+- Tick spacing
+- Tick bitmap
+- Tick information
 
-    Ethereum
-        ↓
-    Uniswap V2 Factory
-        ↓
-    WETH/USDC Pair
-        ↓
-    getReserves()
-        ↓
-    Real reserves
-        ↓
-    AMMPool
-        ↓
-    Swap simulation
+Example live state:
 
-Current pool:
-
-    WETH/USDC
-    Uniswap V2
-
-Real on-chain state is converted from raw token units into human-readable
-amounts and passed directly into the AMM engine.
-
-Example simulation:
-
-    USDC in:          $1,000.00
-    WETH out:         0.52100883
-    Spot price:       ~$1,913.38
-    Effective price:  ~$1,919.35
-    Trading fee:      $3.00
-
-This demonstrates the difference between:
-
-    Spot price
-          ≠
-    Execution price
-
-because AMM trades experience fees and price impact.
+    fee:          500
+    tick spacing: 10
+    liquidity:    18080787383309250914
 
 ---
 
-## Architecture
+## V3 Architecture
 
-    ┌─────────────────────────────────────┐
-    │            Ethereum                 │
-    │                                     │
-    │   Blocks / Transactions / Logs      │
-    └──────────────────┬──────────────────┘
-                       │
-                       ▼
-    ┌─────────────────────────────────────┐
-    │       Blockchain Data Layer         │
-    │                                     │
-    │  RPC Client                         │
-    │  Transaction Decoder                │
-    │  Uniswap V2 Adapter                 │
-    └──────────────────┬──────────────────┘
-                       │
-                       ▼
-    ┌─────────────────────────────────────┐
-    │             AMM Engine              │
-    │                                     │
-    │  Constant Product                   │
-    │  Fees                               │
-    │  Price Impact                       │
-    │  Swap Simulation                    │
-    └──────────────────┬──────────────────┘
-                       │
-                       ▼
-    ┌─────────────────────────────────────┐
-    │         Arbitrage Engine            │
-    │                                     │
-    │  Cross-pool pricing                 │
-    │  Trade sizing                       │
-    │  Profit estimation                  │
-    └──────────────────┬──────────────────┘
-                       │
-                       ▼
-    ┌─────────────────────────────────────┐
-    │            MEV Layer                │
-    │                                     │
-    │  Opportunity Detection              │
-    │  Gas Estimation                     │
-    │  Transaction Ordering               │
-    │  MEV Analysis                       │
-    └─────────────────────────────────────┘
+Unlike V2, Uniswap V3 does not use one constant-product curve across the entire price range.
+
+Liquidity is concentrated into individual price ranges.
+
+The swap engine therefore needs to:
+
+    Current price
+          ↓
+    Active liquidity
+          ↓
+    Calculate next price
+          ↓
+    Find next initialized tick
+          ↓
+    Cross tick if required
+          ↓
+    Update liquidity
+          ↓
+    Continue swap
+          ↓
+    Final amountOut
+
+This is the next major component of the project.
 
 ---
 
 ## Project Structure
 
     onchain-mev-engine/
+    │
+    ├── docs/
+    │   └── amm.md
+    │
+    ├── research/
+    │   ├── amm_experiments.py
+    │   ├── arbitrage_experiment.py
+    │   ├── ethereum_experiment.py
+    │   ├── transaction_experiment.py
+    │   ├── uniswap_experiment.py
+    │   ├── real_amm_experiment.py
+    │   ├── uniswap_v3_experiment.py
+    │   ├── v3_state.py
+    │   └── cross_pool_arbitrage.py
     │
     ├── src/
     │   ├── amm/
@@ -176,134 +162,153 @@ because AMM trades experience fees and price impact.
     │   │
     │   └── blockchain/
     │       ├── client.py
-    │       └── uniswap_v2.py
-    │
-    ├── research/
-    │   ├── amm_experiments.py
-    │   ├── arbitrage_experiment.py
-    │   ├── ethereum_experiment.py
-    │   ├── transaction_experiment.py
-    │   ├── uniswap_experiment.py
-    │   └── real_amm_experiment.py
+    │       ├── uniswap_v2.py
+    │       └── uniswap_v3.py
     │
     ├── tests/
     │   ├── test_pool.py
-    │   └── test_arbitrage.py
-    │
-    ├── docs/
-    │   └── amm.md
+    │   ├── test_arbitrage.py
+    │   └── test_v3/
+    │       ├── test_math.py
+    │       └── test_swap.py
     │
     ├── pyproject.toml
     └── README.md
 
 ---
 
-## Running the Project
+## Testing
 
-Run the AMM experiments:
-
-    python -m research.amm_experiments
-
-Run arbitrage experiments:
-
-    python -m research.arbitrage_experiment
-
-Inspect Ethereum:
-
-    python -m research.ethereum_experiment
-
-Inspect and decode a transaction:
-
-    python -m research.transaction_experiment
-
-Query a real Uniswap V2 pool:
-
-    python -m research.uniswap_experiment
-
-Connect real Uniswap reserves to the AMM engine:
-
-    python -m research.real_amm_experiment
-
-Run tests:
+Run the complete test suite:
 
     python -m pytest
+
+Current test suite:
+
+    16 passed
+
+Tests cover:
+
+- AMM calculations
+- Swap behaviour
+- Arbitrage
+- Optimization
+- V3 mathematical primitives
+- V3 swap calculations
 
 ---
 
 ## Design Philosophy
 
-The project follows a simple principle:
+The project intentionally follows a progression from simplified models to real blockchain infrastructure.
 
-    Understand the mathematics
-            ↓
-    Build the simulation
-            ↓
-    Connect to real blockchain state
-            ↓
-    Validate against real data
-            ↓
-    Build trading strategies
-            ↓
-    Study MEV
+Instead of starting with a black-box MEV bot, each layer is implemented and validated independently:
 
-The core AMM logic is kept independent from the blockchain layer so that the
-same pricing engine can operate on both simulated and real pool state.
+    Mathematics
+        ↓
+    Simulation
+        ↓
+    Testing
+        ↓
+    Blockchain connectivity
+        ↓
+    Real protocol state
+        ↓
+    Execution model
+
+This makes it easier to understand where an MEV opportunity actually comes from.
 
 ---
 
 ## Roadmap
 
-### Milestone 5 — Cross-DEX Arbitrage
+### Milestone 4 — Real Uniswap V3 Swap Engine
 
-- Query multiple real liquidity pools
-- Compare prices
-- Simulate both arbitrage legs
-- Account for AMM fees
-- Estimate gas costs
-- Calculate net PnL
-- Optimize trade size
+- V3 sqrt-price mathematics
+- Amount0 / amount1 calculations
+- Tick traversal
+- Tick bitmap scanning
+- Liquidity updates
+- Multi-tick swaps
+- Exact V3 amountOut
+- V3 swap tests
 
-### Milestone 6 — Uniswap V3
+### Milestone 5 — Cross-Pool Arbitrage
 
-- Concentrated liquidity
-- Ticks
-- Tick spacing
-- `sqrtPriceX96`
-- Liquidity ranges
-- V3 swap mathematics
+- Real V2 → V3 simulation
+- Real V3 → V2 simulation
+- Optimal trade sizing
+- Slippage
+- Gas costs
+- Net profitability
 
-### Milestone 7 — MEV Detection
+### Milestone 6 — MEV Detection
 
-- Pending transactions
-- Large swaps
-- Sandwich opportunities
-- Backrunning
+- Block transaction analysis
+- Swap detection
+- DEX identification
+- Price impact detection
+- Arbitrage opportunity detection
+- Candidate transaction ranking
+
+### Milestone 7 — MEV Simulation
+
 - Transaction ordering
-- Gas bidding
+- Front-run / back-run modelling
+- Sandwich detection
+- Multi-transaction state simulation
+- Gas-aware profitability
 
-### Milestone 8 — Historical MEV Research
+### Milestone 8 — Production Architecture
 
-- Historical blocks
-- Swap reconstruction
-- Arbitrage detection
-- MEV opportunity classification
-- Profit estimation
-- Dataset generation
-
-### Milestone 9 — Research / Production Architecture
-
-- Async blockchain ingestion
-- Concurrent RPC requests
-- Caching
-- Persistent market-state storage
-- Opportunity pipeline
+- Streaming blockchain data
+- Async processing
+- Persistent market state
+- Opportunity queue
+- Latency measurement
 - Monitoring
-- Backtesting
+- Failure handling
+
+---
+
+## Important Concepts
+
+### AMM
+
+Automated Market Maker.
+
+A protocol where prices are determined algorithmically from liquidity rather than through a traditional order book.
+
+### Constant Product
+
+Uniswap V2 uses:
+
+    x * y = k
+
+### Concentrated Liquidity
+
+Uniswap V3 allows liquidity providers to choose the price range where their liquidity is active.
+
+### Tick
+
+A discrete price boundary in Uniswap V3.
+
+Crossing a tick can change the active liquidity available to the swap.
+
+### MEV
+
+Maximal Extractable Value.
+
+The value that can potentially be extracted by controlling or influencing transaction ordering within a block.
+
+### Arbitrage
+
+Buying an asset where it is cheaper and selling it where it is more expensive.
 
 ---
 
 ## Disclaimer
 
-This project is for educational and research purposes.
+This is an educational and research project.
 
-It does not execute live trades or transactions.
+It is not intended to execute trades or interact with mainnet funds.
