@@ -31,6 +31,14 @@ def compute_swap_step(
     fee_pips: int,
 ) -> SwapStepResult:
 
+    if amount_remaining == 0:
+        return SwapStepResult(
+        sqrt_price_next=sqrt_price_current,
+        amount_in=0,
+        amount_out=0,
+        fee_amount=0,
+    )
+
     if liquidity <= 0:
         raise ValueError("liquidity must be positive")
 
