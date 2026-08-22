@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from src.blockchain.client import EthereumClient
 from src.blockchain.swap_detection import (
     PoolMetadata,
     SwapDetector,
@@ -8,12 +7,8 @@ from src.blockchain.swap_detection import (
 
 
 # ============================================================
-# KNOWN UNISWAP V3 POOL
+# TOKENS
 # ============================================================
-
-WETH_USDC_V3 = (
-    "0x88e6A0c2dDD26FEEb64F039a2c41296FcB3f5640"
-)
 
 USDC = (
     "0xA0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
@@ -24,9 +19,58 @@ WETH = (
 )
 
 
+# ============================================================
+# UNISWAP POOLS
+# ============================================================
+
+# Uniswap V2 WETH/USDC
+WETH_USDC_V2 = (
+    "0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc"
+)
+
+# Uniswap V3 WETH/USDC 0.05%
+WETH_USDC_V3 = (
+    "0x88e6A0c2dDD26FEEb64F039a2c41296FcB3f5640"
+)
+
+
+# ============================================================
+# DETECTOR FACTORY
+# ============================================================
+
 def create_detector() -> SwapDetector:
+    """
+    Create the production swap detector.
+
+    Milestone 10 registers two WETH/USDC pools:
+
+        Uniswap V2
+             +
+        Uniswap V3
+
+    This gives the opportunity engine multiple venues
+    from which to detect price discrepancies.
+    """
 
     detector = SwapDetector()
+
+    # --------------------------------------------------------
+    # Uniswap V2
+    # --------------------------------------------------------
+
+    detector.register_pool(
+        PoolMetadata(
+            address=WETH_USDC_V2,
+            dex="Uniswap",
+            version="V2",
+            token0=USDC,
+            token1=WETH,
+        )
+    )
+
+    # --------------------------------------------------------
+    # Uniswap V3
+    # --------------------------------------------------------
 
     detector.register_pool(
         PoolMetadata(
@@ -43,106 +87,57 @@ def create_detector() -> SwapDetector:
     return detector
 
 
-def main():
-
-    client = EthereumClient()
+def main() -> None:
+    """
+    Print the configured MEV pools.
+    """
 
     detector = create_detector()
 
-    latest_block = client.latest_block()
-
     print("=" * 70)
-    print("MEV DETECTION — SWAP DISCOVERY")
+    print("MEV DETECTION — REGISTERED POOLS")
     print("=" * 70)
 
     print()
-    print(
-        f"Latest block: {latest_block}"
-    )
 
-    # --------------------------------------------------------
-    # Analyze the latest block.
-    #
-    # We deliberately keep this to one block for now.
-    # --------------------------------------------------------
+    for address in detector.pool_addresses():
 
-    print()
-    print(
-        f"Analyzing block {latest_block}..."
-    )
+        pool = detector.get_pool(
+            address
+        )
 
-    block = client.get_block(
-        latest_block,
-        full_transactions=True,
-    )
-
-    print(
-        f"Transactions: "
-        f"{len(block['transactions'])}"
-    )
-
-    receipts = client.get_block_receipts(
-        latest_block
-    )
-
-    events = detector.detect_from_receipts(
-        receipts
-    )
-
-    print()
-    print(
-        f"Detected Uniswap swaps: "
-        f"{len(events)}"
-    )
-
-    print()
-    print("-" * 70)
-
-    for event in events:
+        if pool is None:
+            continue
 
         print(
-            f"TX:       {event.tx_hash}"
+            f"DEX:      {pool.dex}"
         )
 
         print(
-            f"DEX:      {event.dex} {event.version}"
+            f"Version:  {pool.version}"
         )
 
         print(
-            f"Pool:     {event.pool_address}"
+            f"Pool:     {pool.address}"
         )
 
         print(
-            f"Token in: {event.token_in}"
+            f"Token0:   {pool.token0}"
         )
 
         print(
-            f"Token out:{event.token_out}"
+            f"Token1:   {pool.token1}"
         )
 
-        print(
-            f"Amount in:{event.amount_in}"
-        )
-
-        print(
-            f"Amount out:{event.amount_out}"
-        )
-
-        if event.version == "V3":
+        if pool.fee is not None:
 
             print(
-                f"Tick:     {event.tick}"
-            )
-
-            print(
-                f"Liquidity:{event.liquidity}"
+                f"Fee:      {pool.fee}"
             )
 
         print(
-            f"Log:      {event.log_index}"
+            "-" * 70
         )
-
-        print("-" * 70)
 
 
 if __name__ == "__main__":
