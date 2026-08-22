@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from typing import Any, Iterable
+from typing import Any
 
 from dotenv import load_dotenv
 from web3 import Web3
@@ -12,19 +12,21 @@ load_dotenv()
 
 class EthereumClient:
     """
-    Ethereum RPC client.
+    Thin Ethereum RPC wrapper.
 
-    Responsibilities:
+    Blockchain layer:
 
-        RPC provider
-            ↓
-        blocks
-        transactions
-        receipts
-        logs
-        gas data
+        RPC
+          ↓
+        raw Ethereum data
 
-    MEV/business logic should remain outside this class.
+    MEV layer:
+
+        raw data
+          ↓
+        decoded events
+          ↓
+        opportunities
     """
 
     def __init__(
@@ -42,8 +44,6 @@ class EthereumClient:
                 "Add it to the .env file."
             )
 
-        self.rpc_url = rpc_url
-
         self.w3 = Web3(
             Web3.HTTPProvider(
                 rpc_url
@@ -55,23 +55,6 @@ class EthereumClient:
                 "Could not connect to Ethereum RPC. "
                 "Check ETH_RPC_URL."
             )
-            
-    @property
-    def web3(self) -> Web3:
-        """
-        Backward-compatible access to the underlying Web3 instance.
-        """
-        return self.w3
-
-    # ========================================================
-    # CONNECTION
-    # ========================================================
-
-    def is_connected(self) -> bool:
-        """
-        Return whether the Ethereum RPC connection is alive.
-        """
-        return self.w3.is_connected()
 
     # ========================================================
     # BLOCKS
@@ -81,6 +64,7 @@ class EthereumClient:
         """
         Return the latest Ethereum block number.
         """
+
         return self.w3.eth.block_number
 
     def get_block(
@@ -91,28 +75,10 @@ class EthereumClient:
         """
         Retrieve an Ethereum block.
         """
+
         return self.w3.eth.get_block(
             block_number,
             full_transactions=full_transactions,
-        )
-
-    def get_block_transaction_hashes(
-        self,
-        block_number: int,
-    ) -> list[Any]:
-        """
-        Retrieve only the transaction hashes from a block.
-
-        This avoids downloading complete transaction objects
-        when they are not required.
-        """
-        block = self.get_block(
-            block_number,
-            full_transactions=False,
-        )
-
-        return list(
-            block["transactions"]
         )
 
     # ========================================================
@@ -124,8 +90,9 @@ class EthereumClient:
         tx_hash: str,
     ):
         """
-        Retrieve a transaction by hash.
+        Retrieve one Ethereum transaction.
         """
+
         return self.w3.eth.get_transaction(
             tx_hash
         )
@@ -135,8 +102,9 @@ class EthereumClient:
         tx_hash: str,
     ):
         """
-        Retrieve a transaction receipt by hash.
+        Retrieve one transaction receipt.
         """
+
         return self.w3.eth.get_transaction_receipt(
             tx_hash
         )
@@ -153,7 +121,10 @@ class EthereumClient:
         topics: list[Any] | None = None,
     ):
         """
-        Retrieve Ethereum event logs over a block range.
+        Retrieve Ethereum logs.
+
+        This is the preferred low-latency ingestion primitive
+        for Milestone 9.
         """
 
         if from_block < 0:
@@ -181,8 +152,38 @@ class EthereumClient:
             filter_params
         )
 
+    def get_logs_for_pools(
+        self,
+        from_block: int,
+        to_block: int,
+        pool_addresses: list[str],
+        topics: list[str],
+    ):
+        """
+        Retrieve only swap-related logs for known pools.
+
+        The topic filter is:
+
+            topic[0] ∈ supported swap topics
+        """
+
+        if not pool_addresses:
+            return []
+
+        if not topics:
+            return []
+
+        return self.get_logs(
+            from_block=from_block,
+            to_block=to_block,
+            address=pool_addresses,
+            topics=[
+                topics
+            ],
+        )
+
     # ========================================================
-    # RECEIPTS
+    # TRANSACTION RECEIPT HELPERS
     # ========================================================
 
     def get_block_receipts(
@@ -192,42 +193,21 @@ class EthereumClient:
         """
         Retrieve all transaction receipts for a block.
 
-        Uses the standard transaction-receipt RPC path so this
-        works with providers that do not expose a dedicated
-        eth_getBlockReceipts method.
+        Kept for compatibility with earlier milestones.
+
+        Milestone 9 should prefer get_logs_for_pools().
         """
 
-        transaction_hashes = (
-            self.get_block_transaction_hashes(
-                block_number
-            )
+        block = self.get_block(
+            block_number,
+            full_transactions=True,
         )
 
         receipts: list[Any] = []
 
-        for tx_hash in transaction_hashes:
-            receipts.append(
-                self.get_transaction_receipt(
-                    tx_hash
-                )
-            )
+        for tx in block["transactions"]:
+            tx_hash = tx["hash"]
 
-        return receipts
-
-    def get_receipts(
-        self,
-        transaction_hashes: Iterable[Any],
-    ) -> list[Any]:
-        """
-        Retrieve receipts for multiple transactions.
-
-        This method provides a reusable batch-processing boundary
-        for higher-level scanners.
-        """
-
-        receipts: list[Any] = []
-
-        for tx_hash in transaction_hashes:
             receipts.append(
                 self.get_transaction_receipt(
                     tx_hash
@@ -242,8 +222,9 @@ class EthereumClient:
 
     def gas_price(self) -> int:
         """
-        Return the current network gas price in wei.
+        Return current gas price.
         """
+
         return self.w3.eth.gas_price
 
     def get_transaction_count(
@@ -251,46 +232,11 @@ class EthereumClient:
         address: str,
     ) -> int:
         """
-        Return the transaction count / nonce for an address.
+        Return transaction nonce for an address.
         """
+
         return self.w3.eth.get_transaction_count(
             Web3.to_checksum_address(
                 address
             )
         )
-
-    # ========================================================
-    # CHAIN STATE
-    # ========================================================
-
-    def chain_id(self) -> int:
-        """
-        Return the connected Ethereum chain ID.
-        """
-        return self.w3.eth.chain_id
-
-    # ========================================================
-    # HEALTH CHECK
-    # ========================================================
-
-    def health_check(self) -> dict[str, Any]:
-        """
-        Return basic RPC health information.
-
-        Useful for monitoring and failure detection.
-        """
-
-        connected = self.is_connected()
-
-        if not connected:
-            return {
-                "connected": False,
-                "chain_id": None,
-                "latest_block": None,
-            }
-
-        return {
-            "connected": True,
-            "chain_id": self.chain_id(),
-            "latest_block": self.latest_block(),
-        }

@@ -27,6 +27,10 @@ UNISWAP_V3_FACTORY = Web3.to_checksum_address(
 )
 
 
+# ============================================================
+# POOL METADATA
+# ============================================================
+
 @dataclass(frozen=True)
 class PoolMetadata:
     """
@@ -44,20 +48,23 @@ class PoolMetadata:
     tick_spacing: int | None = None
 
 
+# ============================================================
+# SWAP DETECTOR
+# ============================================================
+
 class SwapDetector:
     """
     Detect and normalize DEX swap events.
 
-    This class intentionally does not try to infer arbitrary
-    DEXes from transaction calldata.
+    The detector operates on known pool metadata.
 
-    It works from known pool metadata.
-
-    That gives us a deterministic foundation for:
+    Architecture:
 
         Ethereum logs
              ↓
         protocol event
+             ↓
+        SwapDetector
              ↓
         normalized SwapEvent
     """
@@ -72,14 +79,17 @@ class SwapDetector:
             for pool in pools.values():
                 self.register_pool(pool)
 
-    # --------------------------------------------------------
-    # Pool registration
-    # --------------------------------------------------------
+    # ========================================================
+    # POOL REGISTRATION
+    # ========================================================
 
     def register_pool(
         self,
         pool: PoolMetadata,
     ) -> None:
+        """
+        Register a known liquidity pool.
+        """
 
         address = Web3.to_checksum_address(
             pool.address
@@ -91,19 +101,53 @@ class SwapDetector:
         self,
         address: str,
     ) -> PoolMetadata | None:
+        """
+        Return metadata for a known pool.
+        """
 
         return self._pools.get(
             address.lower()
         )
 
-    # --------------------------------------------------------
-    # Topic classification
-    # --------------------------------------------------------
+    def pool_addresses(self) -> list[str]:
+        """
+        Return all registered pool addresses.
+
+        This is used by the block streaming layer to query
+        only relevant logs from Ethereum.
+        """
+
+        return [
+            pool.address
+            for pool in self._pools.values()
+        ]
+
+    # ========================================================
+    # SUPPORTED TOPICS
+    # ========================================================
+
+    @staticmethod
+    def supported_swap_topics() -> list[str]:
+        """
+        Return all swap event topics understood by the detector.
+        """
+
+        return [
+            V2_SWAP_TOPIC,
+            V3_SWAP_TOPIC,
+        ]
+
+    # ========================================================
+    # TOPIC CLASSIFICATION
+    # ========================================================
 
     @staticmethod
     def classify_log(
         log: dict[str, Any],
     ) -> str | None:
+        """
+        Determine whether a log is a supported V2 or V3 swap.
+        """
 
         topics = log.get("topics")
 
@@ -125,16 +169,21 @@ class SwapDetector:
 
         return None
 
-    # --------------------------------------------------------
-    # Decode one log
-    # --------------------------------------------------------
+    # ========================================================
+    # DECODE ONE LOG
+    # ========================================================
 
     def decode_log(
         self,
         log: dict[str, Any],
     ) -> SwapEvent | None:
+        """
+        Decode one Ethereum log.
+        """
 
-        version = self.classify_log(log)
+        version = self.classify_log(
+            log
+        )
 
         if version is None:
             return None
@@ -165,7 +214,6 @@ class SwapDetector:
             )
 
         if version == "V2":
-
             return decode_v2_swap(
                 log=log,
                 tx_hash=tx_hash,
@@ -175,7 +223,6 @@ class SwapDetector:
             )
 
         if version == "V3":
-
             return decode_v3_swap(
                 log=log,
                 tx_hash=tx_hash,
@@ -186,14 +233,17 @@ class SwapDetector:
 
         return None
 
-    # --------------------------------------------------------
-    # Decode transaction receipt
-    # --------------------------------------------------------
+    # ========================================================
+    # DECODE ONE RECEIPT
+    # ========================================================
 
     def detect_from_receipt(
         self,
         receipt: Any,
     ) -> list[SwapEvent]:
+        """
+        Detect swaps from a transaction receipt.
+        """
 
         events: list[SwapEvent] = []
 
@@ -204,7 +254,6 @@ class SwapDetector:
         )
 
         for log in logs:
-
             event = self.decode_log(
                 log
             )
@@ -217,19 +266,84 @@ class SwapDetector:
             key=lambda event: event.log_index,
         )
 
-    # --------------------------------------------------------
-    # Decode multiple receipts
-    # --------------------------------------------------------
+    # ========================================================
+    # DECODE LOGS DIRECTLY
+    # ========================================================
+
+    def detect_from_logs(
+        self,
+        logs: list[Any],
+    ) -> list[SwapEvent]:
+        """
+        Detect swaps directly from Ethereum logs.
+
+        This is the preferred ingestion path for Milestone 9.
+
+        Instead of:
+
+            block
+              ↓
+            transactions
+              ↓
+            receipts
+              ↓
+            logs
+
+        we now use:
+
+            block
+              ↓
+            eth_getLogs
+              ↓
+            swap logs
+        """
+
+        events: list[SwapEvent] = []
+
+        for log in logs:
+            event = self.decode_log(
+                log
+            )
+
+            if event is not None:
+                events.append(event)
+
+        return sorted(
+            events,
+            key=lambda event: (
+                getattr(
+                    event,
+                    "block_number",
+                    0,
+                ),
+                getattr(
+                    event,
+                    "transaction_index",
+                    0,
+                ),
+                getattr(
+                    event,
+                    "log_index",
+                    0,
+                ),
+            ),
+        )
+
+    # ========================================================
+    # DECODE MULTIPLE RECEIPTS
+    # ========================================================
 
     def detect_from_receipts(
         self,
         receipts: list[Any],
     ) -> list[SwapEvent]:
+        """
+        Detect swaps from multiple transaction receipts.
+        """
 
         events: list[SwapEvent] = []
 
         for receipt in receipts:
-
             events.extend(
                 self.detect_from_receipt(
                     receipt
