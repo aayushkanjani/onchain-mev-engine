@@ -1,765 +1,610 @@
 # On-Chain MEV Engine
 
-A research-oriented Ethereum MEV engine built from first principles.
+A research-grade educational project for understanding and building an on-chain MEV engine from first principles.
 
-The project progressively evolves from AMM mathematics and arbitrage simulation into a real-time blockchain data pipeline capable of detecting swaps, maintaining market state, and identifying cross-pool MEV opportunities.
+The project progressively evolves from AMM mathematics into a real-time Ethereum MEV detection, opportunity analysis, execution simulation, and strategy evaluation pipeline.
 
 The overall progression is:
 
-```text
-AMM Mathematics
-      ↓
-Arbitrage Simulation
-      ↓
-Real Ethereum Data
-      ↓
-Real Uniswap State
-      ↓
-Uniswap V3 Concentrated Liquidity
-      ↓
-Cross-Pool Arbitrage
-      ↓
-MEV Detection
-      ↓
-Production Architecture
-      ↓
-Real-Time Block Processing
-      ↓
-MEV Opportunity Detection
-```
+    AMM Mathematics
+          ↓
+    Arbitrage Simulation
+          ↓
+    Ethereum RPC Connectivity
+          ↓
+    Real Uniswap State
+          ↓
+    Uniswap V3 Mathematics
+          ↓
+    Cross-Pool Arbitrage
+          ↓
+    MEV Detection
+          ↓
+    Production Block Processing
+          ↓
+    Real-Time MEV Pipeline
+          ↓
+    Opportunity Detection
+          ↓
+    Execution Simulation
+          ↓
+    MEV Strategy Layer
+          ↓
+    Backtesting & Evaluation
+
 
 ---
 
-# Architecture
+# Project Goal
 
-The current system follows a layered architecture:
+The goal of this project is to understand how a real MEV system can be constructed layer by layer.
 
-```mermaid
-flowchart TD
-    A[Ethereum RPC] --> B[Block / Log Stream]
+Instead of starting with a black-box trading bot, the project separates:
 
-    B --> C[Swap Detection]
+    Blockchain Data
+          ↓
+    Protocol Events
+          ↓
+    Market State
+          ↓
+    Opportunity Detection
+          ↓
+    Strategy Selection
+          ↓
+    Execution Simulation
+          ↓
+    Profitability Analysis
 
-    C --> D[Normalized Swap Events]
+Every major layer is independently testable.
 
-    D --> E[Market Observations]
-
-    E --> F[Market State]
-
-    F --> G[MEV Opportunity Detection]
-
-    G --> H[Arbitrage Candidate]
-
-    H --> I[Trade Simulation]
-
-    I --> J[Fees + Slippage + Gas]
-
-    J --> K[Net Profitability]
-
-    B --> L[Production Metrics]
-    C --> L
-    G --> L
-    K --> L
-```
-
-The real-time data flow is:
-
-```text
-Ethereum
-   │
-   ▼
-Block Stream
-   │
-   ▼
-Swap Detection
-   │
-   ▼
-Normalized Swap Events
-   │
-   ▼
-Market Observations
-   │
-   ▼
-Market State
-   │
-   ▼
-Opportunity Detection
-   │
-   ▼
-Arbitrage Simulation
-   │
-   ▼
-Profitability Analysis
-```
-
-The project currently stops at **research and opportunity detection**. It does not submit live trades.
 
 ---
 
-# Current Progress
+# System Architecture
+
+The current architecture can be summarized as:
+
+    ┌───────────────────────────────┐
+    │        Ethereum RPC          │
+    │                               │
+    │ Blocks / Transactions / Logs  │
+    └───────────────┬───────────────┘
+                    │
+                    ▼
+    ┌───────────────────────────────┐
+    │       Blockchain Client        │
+    │                               │
+    │ RPC abstraction               │
+    │ Block retrieval               │
+    │ Transaction receipts          │
+    │ Event logs                    │
+    └───────────────┬───────────────┘
+                    │
+                    ▼
+    ┌───────────────────────────────┐
+    │        Swap Detection         │
+    │                               │
+    │ Uniswap V2 events             │
+    │ Uniswap V3 events             │
+    │ Pool metadata                 │
+    └───────────────┬───────────────┘
+                    │
+                    ▼
+    ┌───────────────────────────────┐
+    │        Market State           │
+    │                               │
+    │ Pool prices                   │
+    │ Liquidity                     │
+    │ Swap observations             │
+    └───────────────┬───────────────┘
+                    │
+                    ▼
+    ┌───────────────────────────────┐
+    │    Opportunity Detection      │
+    │                               │
+    │ Cross-pool price differences  │
+    │ Spread calculation            │
+    │ Gross profit estimation       │
+    └───────────────┬───────────────┘
+                    │
+                    ▼
+    ┌───────────────────────────────┐
+    │      Strategy Layer           │
+    │                               │
+    │ Arbitrage                     │
+    │ Sandwich simulation           │
+    │ Strategy selection            │
+    └───────────────┬───────────────┘
+                    │
+                    ▼
+    ┌───────────────────────────────┐
+    │     Execution Simulator       │
+    │                               │
+    │ Gas costs                     │
+    │ Slippage                      │
+    │ Net profitability             │
+    │ Local state simulation        │
+    └───────────────┬───────────────┘
+                    │
+                    ▼
+    ┌───────────────────────────────┐
+    │      Evaluation Layer         │
+    │                               │
+    │ Backtesting                   │
+    │ Strategy statistics           │
+    │ Profitability analysis        │
+    └───────────────────────────────┘
+
+
+---
+
+# Milestone Progress
 
 ## Milestone 1 — AMM & Arbitrage
 
-Built a constant-product AMM using:
-
-```text
-x × y = k
-```
+Built a constant-product AMM from first principles.
 
 Implemented:
 
-* AMM reserves
-* Spot price
-* Trading fees
-* Swap calculations
-* Pool state updates
-* Arbitrage simulation
-* Arbitrage PnL
-* Trade-size optimization
-* Unit tests
+- AMM reserves
+- Constant-product invariant
+- Spot price
+- Trading fees
+- Swap calculations
+- Pool state updates
+- Arbitrage simulation
+- Arbitrage PnL
+- Trade-size optimization
+- Unit tests
 
-The engine can simulate arbitrage between two AMMs and determine whether a trade is profitable.
+Core model:
+
+    x * y = k
+
 
 ---
 
-# Milestone 2 — Ethereum Connectivity
+## Milestone 2 — Ethereum Connectivity
 
 Connected the engine to a real Ethereum RPC.
 
 Implemented:
 
-* Ethereum RPC client
-* Latest block retrieval
-* Block inspection
-* Transaction retrieval
-* Transaction receipts
-* Event logs
-* ERC-20 Transfer decoding
-* Token decimal conversion
-* Gas information
+- Ethereum RPC client
+- Latest block retrieval
+- Block inspection
+- Transaction retrieval
+- Transaction receipts
+- Event logs
+- ERC-20 Transfer decoding
+- Token decimal conversion
+- Gas price retrieval
+- Transaction count retrieval
 
-The engine can now work with real Ethereum blockchain data instead of relying only on simulated data.
 
 ---
 
-# Milestone 3 — Real Uniswap State
+## Milestone 3 — Real Uniswap State
 
-Connected directly to Uniswap contracts on Ethereum.
+Connected the engine directly to real Uniswap contracts on Ethereum.
 
-## Uniswap V2
+### Uniswap V2
 
 Implemented:
 
-* Factory lookup
-* Pair discovery
-* Token identification
-* Real reserves
-* Spot price calculation
-* Real pool state
-* Swap simulation using real reserves
+- Factory lookup
+- Pair discovery
+- Token identification
+- Real reserves
+- Spot price calculation
+- Swap simulation
+- Real pool state
 
-## Uniswap V3
+### Uniswap V3
 
 Connected to the WETH/USDC 0.05% pool:
 
-```text
-0x88e6A0c2dDD26FEEb64F039a2c41296FcB3f5640
-```
+    0x88e6A0c2dDD26FEEb64F039a2c41296FcB3f5640
 
 Implemented retrieval of:
 
-* `slot0`
-* `sqrtPriceX96`
-* Current tick
-* Active liquidity
-* Pool fee
-* Tick spacing
-* Tick bitmap
-* Tick information
+- slot0
+- sqrtPriceX96
+- Current tick
+- Active liquidity
+- Pool fee
+- Tick spacing
+- Tick bitmap
+- Tick information
+
 
 ---
 
-# Milestone 4 — Uniswap V3 Swap Engine
+# Uniswap V3 Architecture
 
-Unlike Uniswap V2, Uniswap V3 uses concentrated liquidity.
+Unlike V2, Uniswap V3 concentrates liquidity into specific price ranges.
 
-Liquidity is distributed across discrete price ranges rather than across one global constant-product curve.
+The swap engine therefore needs to model:
 
-The V3 swap engine therefore models:
+    Current sqrt price
+          ↓
+    Active liquidity
+          ↓
+    Calculate swap step
+          ↓
+    Find next initialized tick
+          ↓
+    Cross tick
+          ↓
+    Update liquidity
+          ↓
+    Continue
+          ↓
+    Final amountOut
 
-```text
-Current Price
-      ↓
-Active Liquidity
-      ↓
-Calculate Next Price
-      ↓
-Find Next Initialized Tick
-      ↓
-Cross Tick
-      ↓
-Update Liquidity
-      ↓
-Continue Swap
-      ↓
-Final Amount Out
-```
 
-Implemented and tested:
+This project implements the mathematical foundation required for this process.
 
-* Q96 fixed-point mathematics
-* Amount0 calculations
-* Amount1 calculations
-* Swap-step mathematics
-* Tick traversal
-* Tick crossing
-* Tick bitmap positioning
-* Liquidity updates
-* Exact-input swap calculations
 
 ---
 
-# Milestone 5 — Cross-Pool Arbitrage
-
-Connected real pool state to arbitrage simulation.
-
-The engine can model:
-
-```text
-Uniswap V2
-     │
-     │ Buy
-     ▼
-   Asset
-     │
-     │ Sell
-     ▼
-Uniswap V3
-```
-
-and the reverse direction:
-
-```text
-Uniswap V3
-     │
-     │ Buy
-     ▼
-   Asset
-     │
-     │ Sell
-     ▼
-Uniswap V2
-```
+## Milestone 4 — Uniswap V3 Swap Engine
 
 Implemented:
 
-* Real V2/V3 pool comparison
-* Cross-pool arbitrage
-* Trade-size optimization
-* Slippage
-* Trading fees
-* Gas-cost modelling
-* Net profitability calculations
+- Q96 fixed-point mathematics
+- sqrt-price calculations
+- Amount0 calculations
+- Amount1 calculations
+- Swap step calculations
+- Tick traversal
+- Tick bitmap handling
+- Tick crossing
+- Liquidity updates
+- Multi-step swaps
+- V3 swap tests
 
-The important distinction is:
+The V3 implementation now models the concentrated-liquidity mechanics instead of treating the pool as a simple V2-style constant-product AMM.
 
-```text
-Price Difference
-      ↓
-Trade Simulation
-      ↓
-Fees
-      ↓
-Slippage
-      ↓
-Gas
-      ↓
-Net Profit
-```
-
-A price discrepancy by itself is not necessarily a profitable arbitrage opportunity.
 
 ---
 
-# Milestone 6 — MEV Detection
+## Milestone 5 — Cross-Pool Arbitrage
 
-Introduced event-level MEV detection.
+Implemented cross-pool arbitrage between real Uniswap pools.
 
 Implemented:
 
-* Ethereum block analysis
-* Transaction receipt processing
-* Uniswap V2 swap detection
-* Uniswap V3 swap detection
-* DEX identification
-* Pool metadata
-* Swap event normalization
-* Transaction ordering
-* Log ordering
-* Unknown-pool filtering
-* Non-swap event filtering
+- V2 → V3 arbitrage
+- V3 → V2 arbitrage
+- Trade-size simulation
+- Trade-size optimization
+- Slippage
+- Gas costs
+- Gross profit
+- Net profit
+- Profitability checks
 
-The detection architecture is:
+The system can compare different pool states and determine whether an arbitrage route is economically viable.
 
-```text
-Ethereum Receipt
-       ↓
-Ethereum Logs
-       ↓
-Event Topic
-       ↓
-Pool Metadata
-       ↓
-V2 / V3 Decoder
-       ↓
-Normalized SwapEvent
-```
 
 ---
 
-# Milestone 7 — MEV Simulation
+## Milestone 6 — MEV Detection
 
-Extended the engine toward transaction-level MEV modelling.
-
-Implemented infrastructure for:
-
-* Transaction ordering
-* Multi-transaction state simulation
-* Front-run / back-run modelling
-* Sandwich-style analysis
-* Gas-aware profitability
-* Execution simulation
-
-The goal is to understand how transaction ordering can change the state of an AMM and therefore create or destroy MEV opportunities.
-
----
-
-# Milestone 8 — Production Architecture
-
-Introduced production-oriented infrastructure around the MEV engine.
+Built the first event-driven MEV detection layer.
 
 Implemented:
 
-* Persistent market state
-* Production block processing
-* Opportunity queue
-* Async processing
-* Processing metrics
-* Latency measurement
-* Failure tracking
-* Queue monitoring
-* Block-state persistence
+- Ethereum block analysis
+- Transaction receipt processing
+- Uniswap V2 Swap event detection
+- Uniswap V3 Swap event detection
+- DEX identification
+- Pool metadata
+- Event normalization
+- Swap classification
+- Transaction ordering
+- Log ordering
 
-The production architecture is:
+The system converts raw Ethereum logs into normalized swap events.
 
-```text
-Ethereum
-    ↓
-Block Processor
-    ↓
-Swap Detection
-    ↓
-Market State
-    ↓
-Opportunity Queue
-    ↓
-Metrics / Monitoring
-```
-
-A production-engine demonstration processes real Ethereum blocks and records operational metrics.
 
 ---
 
-# Milestone 9 — Real-Time Block Processing
+## Milestone 7 — MEV Simulation
 
-Introduced continuous real-time blockchain processing.
+Extended the engine from event detection into MEV simulation.
 
 Implemented:
 
-* Ethereum block streaming
-* New-block detection
-* Block progression validation
-* Confirmation handling
-* Polling
-* Real-time swap detection
-* Market observation generation
-* Real-time metrics
+- Transaction ordering
+- Multi-transaction state modelling
+- Price impact analysis
+- Arbitrage modelling
+- Sandwich modelling
+- Gas-aware profitability
+- Execution feasibility analysis
+
+The objective is to model what could happen if transactions were executed in a particular order.
+
+
+---
+
+## Milestone 8 — Production Architecture
+
+Introduced a production-oriented processing architecture.
+
+Implemented:
+
+- Block streaming
+- Async processing
+- Persistent market state
+- Opportunity queues
+- Metrics
+- Latency measurement
+- Failure handling
+- Block validation
+- State replacement
+- Multi-block processing
+
+The engine moved from isolated scripts toward a continuously running pipeline.
+
+
+---
+
+## Milestone 9 — Real-Time Blockchain Pipeline
+
+Connected the production architecture to real Ethereum blocks.
+
+Implemented:
+
+- Real-time block processing
+- Ethereum block stream
+- Swap discovery
+- Market observations
+- Opportunity detection
+- Pipeline metrics
+- Continuous processing architecture
 
 The real-time pipeline is:
 
-```text
-Latest Ethereum Block
-        ↓
-Block Stream
-        ↓
-New Block
-        ↓
-Block Processing
-        ↓
-Swap Detection
-        ↓
-Market Observations
-```
+    Ethereum Blocks
+          ↓
+    Block Stream
+          ↓
+    Swap Detection
+          ↓
+    Market Observations
+          ↓
+    Opportunity Detection
+          ↓
+    MEV Opportunities
 
-The engine can now process newly produced Ethereum blocks instead of only analyzing historical blocks manually.
 
 ---
 
-# Milestone 10 — MEV Opportunity Detection
+## Milestone 10 — MEV Opportunity Detection
 
-Introduced the opportunity-detection layer on top of the real-time market pipeline.
+Implemented a dedicated opportunity detection layer.
 
-The architecture is now:
+The system now separates:
 
-```text
-Ethereum
-   ↓
-Block Stream
-   ↓
-Swap Detection
-   ↓
-Normalized Swap Events
-   ↓
-Market Observations
-   ↓
-Opportunity Detection
-   ↓
-Arbitrage Opportunities
-```
+    Raw Swap Events
+          ↓
+    Market Observations
+          ↓
+    Price Comparison
+          ↓
+    Arbitrage Opportunity
+          ↓
+    Profitability Estimate
 
-The opportunity engine compares market observations from different liquidity pools.
+Implemented:
 
-For example:
+- Pool observation model
+- Cross-pool price comparison
+- Spread calculation
+- Spread percentage
+- Gross profit estimation
+- Minimum-spread filtering
+- Opportunity ranking
+- Real-time opportunity detection
 
-```text
-                 USDC / WETH
-                     │
-          ┌──────────┴──────────┐
-          │                     │
-          ▼                     ▼
-     Uniswap V2            Uniswap V3
-     Buy Pool              Sell Pool
-          │                     │
-          ▼                     ▼
-      0.000520             0.000525
-          │                     │
-          └──────────┬──────────┘
-                     ▼
-               Price Spread
-                     │
-                     ▼
-            MEV Opportunity
-```
+Example:
 
-The detection layer calculates:
+    V2 Price
+       │
+       │
+       ├───────────────┐
+       │               │
+       ▼               ▼
+    Buy Pool        Sell Pool
+       │               │
+       └───────┬───────┘
+               │
+               ▼
+        Price Difference
+               │
+               ▼
+         MEV Opportunity
 
-* Buy price
-* Sell price
-* Absolute spread
-* Spread percentage
-* Gross price difference
-* Candidate arbitrage direction
-
-The current implementation deliberately separates **opportunity detection** from **execution**.
 
 ---
 
-# Real-Time Pipeline
+## Milestone 11 — Execution Simulation & MEV Strategy Layer
 
-The complete current pipeline is:
+Added a dedicated execution and strategy layer on top of opportunity detection.
 
-```mermaid
-flowchart LR
-    A[Ethereum RPC] --> B[Block Stream]
-    B --> C[Block Scanner]
-    C --> D[Transaction Receipts]
-    D --> E[Swap Detector]
-    E --> F[Normalized Swap Events]
-    F --> G[Market Observations]
-    G --> H[Opportunity Detector]
-    H --> I[Arbitrage Candidate]
-    I --> J[Simulation]
-    J --> K[Profitability]
-```
+The architecture became:
 
-This separation allows each component to be tested independently.
+    Opportunity
+         ↓
+    Strategy Selection
+         ↓
+    Execution Simulation
+         ↓
+    Gas Estimation
+         ↓
+    Gross Profit
+         ↓
+    Net Profit
+         ↓
+    Profitability Decision
 
----
 
-# Current Live Pipeline
+Implemented:
 
-The real-time engine can be launched with:
+- Execution simulator
+- Gas cost calculation
+- Native-token price modelling
+- Arbitrage strategy simulation
+- Sandwich strategy simulation
+- Net profit calculation
+- Profitability evaluation
+- Local pool-state simulation
+- Strategy abstraction
+- Strategy result models
 
-```powershell
-python -m research.realtime_engine
-```
+Example execution result:
 
-A successful run currently produces output similar to:
+    Gross Profit
+         ↓
+      - Gas
+         ↓
+    Net Profit
+         ↓
+    Profitable?
+       /   \
+     Yes    No
 
-```text
-ON-CHAIN MEV ENGINE — REAL-TIME MEV PIPELINE
 
-Starting block:  25807451
-Maximum blocks:  1
-Confirmations:   0
-Poll interval:   1.0s
-Min spread:      0.1%
+The simulator deliberately does not sign or broadcast transactions.
 
-Pipeline:
-Ethereum logs
-      ↓
-Swap detection
-      ↓
-Market observations
-      ↓
-MEV opportunity detection
+All execution is performed against copied local state.
 
-Block: 25807451
-Swaps detected: 1
-Market observations: 1
-MEV opportunities:   0
-```
-
-A zero-opportunity result is valid.
-
-It means that the observed market state did not satisfy the configured opportunity criteria.
 
 ---
 
-# Opportunity Detection Example
+# Final Milestone — Backtesting & Strategy Evaluation
 
-The opportunity detection layer can compare two observations such as:
+The final stage of the project focuses on evaluating the strategies built throughout the previous milestones.
 
-```text
-Pair:
-USDC / WETH
+The objective is no longer simply:
 
-Buy Pool:
-Uniswap V2
+    "Can the engine detect an opportunity?"
 
-Sell Pool:
-Uniswap V3
+Instead:
 
-Buy Price:
-0.000520000000
+    "How would the strategy have performed across historical opportunities?"
 
-Sell Price:
-0.000525000000
 
-Spread:
-0.000005000000
+The final evaluation layer can analyze:
 
-Spread:
-0.9615%
-```
+- Historical blocks
+- Historical swaps
+- Historical price differences
+- Historical opportunities
+- Strategy profitability
+- Gas-adjusted returns
+- Number of opportunities
+- Win rate
+- Average profit
+- Maximum profit
+- Maximum loss
+- Strategy performance
 
-The engine identifies this as a candidate cross-pool arbitrage opportunity.
 
-However, the opportunity still needs to pass execution analysis:
+The conceptual architecture becomes:
 
-```text
-Detected Spread
-      ↓
-Trade Size
-      ↓
-AMM Price Impact
-      ↓
-DEX Fees
-      ↓
-Slippage
-      ↓
-Gas
-      ↓
-Execution Constraints
-      ↓
-Net Profit
-```
+    Historical Ethereum Blocks
+              ↓
+       Historical Swaps
+              ↓
+        Market State
+              ↓
+      Opportunity Detection
+              ↓
+       Strategy Simulation
+              ↓
+        Execution Model
+              ↓
+       Profitability Model
+              ↓
+          Statistics
+              ↓
+        Strategy Evaluation
 
-Therefore:
-
-```text
-Detected Opportunity ≠ Guaranteed Profit
-```
 
 ---
 
 # Project Structure
 
-```text
-onchain-mev-engine/
-│
-├── docs/
-│   └── amm.md
-│
-├── research/
-│   ├── amm_experiments.py
-│   ├── arbitrage_experiment.py
-│   ├── ethereum_experiment.py
-│   ├── transaction_experiment.py
-│   ├── uniswap_experiment.py
-│   ├── real_amm_experiment.py
-│   ├── uniswap_v3_experiment.py
-│   ├── v3_state.py
-│   ├── cross_pool_arbitrage.py
-│   ├── production_engine.py
-│   ├── realtime_engine.py
-│   └── opportunity_engine.py
-│
-├── src/
-│   │
-│   ├── amm/
-│   │   ├── pool.py
-│   │   ├── math.py
-│   │   ├── arbitrage.py
-│   │   ├── optimizer.py
-│   │   └── simulator.py
-│   │
-│   ├── blockchain/
-│   │   ├── client.py
-│   │   ├── events.py
-│   │   ├── swap_detection.py
-│   │   ├── uniswap_v2.py
-│   │   └── uniswap_v3.py
-│   │
-│   ├── mev/
-│   │   ├── block_scanner.py
-│   │   └── block_stream.py
-│   │
-│   └── mev_detection.py
-│
-├── tests/
-│   ├── test_arbitrage.py
-│   ├── test_block_scanner.py
-│   ├── test_block_stream.py
-│   ├── test_execution.py
-│   ├── test_mev_detection.py
-│   ├── test_pool.py
-│   ├── test_production.py
-│   ├── test_slippage.py
-│   │
-│   └── test_v3/
-│       ├── test_math.py
-│       ├── test_pool.py
-│       ├── test_swap.py
-│       └── test_tick_state.py
-│
-├── pyproject.toml
-├── README.md
-└── .env
-```
+    onchain-mev-engine/
+    │
+    ├── docs/
+    │   └── amm.md
+    │
+    ├── research/
+    │   ├── amm_experiments.py
+    │   ├── arbitrage_experiment.py
+    │   ├── ethereum_experiment.py
+    │   ├── transaction_experiment.py
+    │   ├── uniswap_experiment.py
+    │   ├── real_amm_experiment.py
+    │   ├── uniswap_v3_experiment.py
+    │   ├── v3_state.py
+    │   ├── cross_pool_arbitrage.py
+    │   ├── production_engine.py
+    │   ├── realtime_engine.py
+    │   ├── opportunity_engine.py
+    │   └── mev_strategy_engine.py
+    │
+    ├── src/
+    │   │
+    │   ├── amm/
+    │   │   ├── pool.py
+    │   │   ├── math.py
+    │   │   ├── arbitrage.py
+    │   │   ├── optimizer.py
+    │   │   └── simulator.py
+    │   │
+    │   ├── blockchain/
+    │   │   ├── client.py
+    │   │   ├── events.py
+    │   │   ├── swap_detection.py
+    │   │   ├── uniswap_v2.py
+    │   │   └── uniswap_v3.py
+    │   │
+    │   └── mev/
+    │       ├── block_scanner.py
+    │       ├── block_stream.py
+    │       ├── opportunity.py
+    │       ├── execution.py
+    │       └── strategy.py
+    │
+    ├── tests/
+    │   ├── test_pool.py
+    │   ├── test_arbitrage.py
+    │   ├── test_block_scanner.py
+    │   ├── test_block_stream.py
+    │   ├── test_mev_detection.py
+    │   ├── test_opportunity.py
+    │   ├── test_production.py
+    │   ├── test_execution.py
+    │   ├── test_strategy.py
+    │   ├── test_slippage.py
+    │   │
+    │   └── test_v3/
+    │       ├── test_math.py
+    │       ├── test_pool.py
+    │       ├── test_swap.py
+    │       └── test_tick_state.py
+    │
+    ├── pyproject.toml
+    ├── .env
+    └── README.md
 
----
-
-# Important Components
-
-## Ethereum Client
-
-`src/blockchain/client.py`
-
-Provides the low-level Ethereum RPC interface.
-
-Responsibilities include:
-
-* Block retrieval
-* Transaction retrieval
-* Transaction receipts
-* Event logs
-* Gas price
-* Transaction counts
-* Block receipt processing
-
-The client intentionally contains no MEV-specific logic.
-
-```text
-RPC
- ↓
-EthereumClient
- ↓
-Raw Blockchain Data
-```
-
----
-
-## Swap Detector
-
-`src/blockchain/swap_detection.py`
-
-Converts raw Ethereum logs into normalized swap events.
-
-Supported protocols:
-
-```text
-Uniswap V2
-Uniswap V3
-```
-
-The detector uses registered pool metadata rather than trying to infer arbitrary DEX behaviour from calldata.
-
----
-
-## Block Scanner
-
-`src/mev/block_scanner.py`
-
-Scans Ethereum blocks and processes transaction receipts.
-
-```text
-Block
- ↓
-Transactions
- ↓
-Receipts
- ↓
-Swap Detection
- ↓
-Ordered Swap Events
-```
-
-It supports both individual blocks and inclusive block ranges.
-
----
-
-## Block Stream
-
-`src/mev/block_stream.py`
-
-Provides real-time block processing.
-
-```text
-Ethereum
-   ↓
-Latest Block
-   ↓
-New Block Detection
-   ↓
-Block Processing
-   ↓
-Downstream Pipeline
-```
-
-It also validates block progression and confirmation requirements.
-
----
-
-## Opportunity Detection
-
-The opportunity detection layer consumes normalized market observations.
-
-```text
-Market Observation A
-          +
-Market Observation B
-          ↓
-     Pair Matching
-          ↓
-   Price Comparison
-          ↓
-     Spread Check
-          ↓
-MEV Opportunity
-```
-
-This separation allows the opportunity detector to operate independently from Ethereum RPC infrastructure.
 
 ---
 
@@ -767,263 +612,490 @@ This separation allows the opportunity detector to operate independently from Et
 
 Run the complete test suite:
 
-```powershell
-python -m pytest -vv
-```
+    python -m pytest -vv
 
-The current test suite contains **51 tests** covering:
+The test suite covers the major components of the engine.
 
-* AMM calculations
-* Swap behaviour
-* Arbitrage
-* Arbitrage optimization
-* Execution profitability
-* Gas calculations
-* Slippage
-* Ethereum block scanning
-* Block streaming
-* Production architecture
-* Market-state persistence
-* Opportunity queue
-* MEV detection
-* Uniswap V3 mathematics
-* Uniswap V3 pool simulation
-* Uniswap V3 swap logic
-* Tick state
-* Tick bitmap calculations
+Coverage includes:
 
-Current status:
+- AMM mathematics
+- Pool behaviour
+- Swap calculations
+- Arbitrage
+- Trade optimization
+- Slippage
+- Ethereum connectivity abstractions
+- V2 event decoding
+- V3 event decoding
+- V3 swap mathematics
+- Tick traversal
+- Tick bitmap handling
+- Block scanning
+- Block streaming
+- Market-state persistence
+- Production metrics
+- Opportunity detection
+- Execution simulation
+- MEV strategy evaluation
 
-```text
-51 passed
-```
 
 ---
 
-# Running the Project
+# Example Commands
 
-## Run all tests
+## Run AMM experiments
 
-```powershell
-python -m pytest -vv
-```
+    python -m research.amm_experiments
 
----
+
+## Run arbitrage experiments
+
+    python -m research.arbitrage_experiment
+
+
+## Inspect Ethereum
+
+    python -m research.ethereum_experiment
+
+
+## Inspect transactions
+
+    python -m research.transaction_experiment
+
+
+## Inspect Uniswap V2
+
+    python -m research.uniswap_experiment
+
+
+## Inspect real AMM state
+
+    python -m research.real_amm_experiment
+
+
+## Inspect Uniswap V3
+
+    python -m research.uniswap_v3_experiment
+
+
+## Inspect V3 state
+
+    python -m research.v3_state
+
+
+## Run cross-pool arbitrage
+
+    python -m research.cross_pool_arbitrage
+
+
+## Run production architecture
+
+    python -m research.production_engine
+
+
+## Run real-time pipeline
+
+    python -m research.realtime_engine
+
 
 ## Run opportunity detection
 
-```powershell
-python -m research.opportunity_engine
-```
+    python -m research.opportunity_engine
 
-This demonstrates cross-pool MEV opportunity detection using normalized market observations.
 
----
+## Run execution and strategy simulation
 
-## Run the real-time engine
+    python -m research.mev_strategy_engine
 
-```powershell
-python -m research.realtime_engine
-```
-
-This connects the real-time block stream to swap detection, market observations, and opportunity detection.
 
 ---
 
-## Run the production engine
+# Core Concepts
 
-```powershell
-python -m research.production_engine
-```
+## AMM
 
-This demonstrates production-style block processing, persistent market state, queue handling, and metrics.
+An Automated Market Maker is a protocol where prices are determined algorithmically from liquidity rather than through a traditional order book.
 
----
 
-# Configuration
+## Constant Product
 
-Create a `.env` file in the project root:
+Uniswap V2 uses:
 
-```text
-ETH_RPC_URL=YOUR_ETHEREUM_RPC_URL
-```
+    x * y = k
 
-The Ethereum client loads the RPC endpoint using `python-dotenv`.
 
-Do not commit private API keys or credentials.
+## Concentrated Liquidity
+
+Uniswap V3 allows liquidity providers to choose the price range where their liquidity is active.
+
+
+## Tick
+
+A discrete price boundary in Uniswap V3.
+
+Crossing a tick can change the active liquidity available to a swap.
+
+
+## MEV
+
+Maximal Extractable Value.
+
+MEV represents value that can potentially be extracted from transaction ordering and execution within a blockchain block.
+
+
+## Arbitrage
+
+Arbitrage attempts to exploit price differences for the same asset across different markets.
+
+Conceptually:
+
+    Buy Cheap
+        ↓
+    Sell Expensive
+        ↓
+    Gross Profit
+        ↓
+    - Costs
+        ↓
+    Net Profit
+
+
+## Sandwich
+
+A sandwich strategy models transactions placed before and after a victim transaction.
+
+Conceptually:
+
+    Attacker Buy
+          ↓
+    Victim Swap
+          ↓
+    Attacker Sell
+          ↓
+    Profit / Loss
+
+
+## Slippage
+
+Slippage represents the difference between the expected execution price and the actual execution price.
+
+Large trades generally cause larger price impact in AMMs.
+
+
+## Gas
+
+Ethereum execution requires gas.
+
+Therefore a theoretical arbitrage opportunity is not necessarily profitable.
+
+The actual decision should consider:
+
+    Net Profit =
+        Gross Profit
+        - Gas Cost
+        - Other Execution Costs
+
 
 ---
 
 # Design Philosophy
 
-The project intentionally avoids jumping directly to a black-box MEV bot.
+The project follows a progression from mathematical models to blockchain infrastructure and strategy evaluation.
 
-Each layer is implemented and tested independently:
+The core philosophy is:
 
-```text
-Mathematics
-     ↓
-Simulation
-     ↓
-Unit Testing
-     ↓
-Blockchain Connectivity
-     ↓
-Real Protocol State
-     ↓
-Event Detection
-     ↓
-Market State
-     ↓
-Opportunity Detection
-     ↓
-Execution Simulation
-```
+    Understand
+        ↓
+    Implement
+        ↓
+    Test
+        ↓
+    Connect to Reality
+        ↓
+    Measure
+        ↓
+    Simulate
+        ↓
+    Evaluate
 
-This makes it possible to understand exactly where an MEV opportunity comes from and how each component contributes to its profitability.
 
----
+Each layer has a clear responsibility.
 
-# Key Concepts
+### Blockchain Layer
 
-## AMM
+Responsible for obtaining Ethereum data.
 
-An Automated Market Maker determines prices algorithmically from liquidity rather than using a traditional order book.
+### Protocol Layer
 
----
+Responsible for decoding Uniswap events and understanding pool mechanics.
 
-## Constant Product
+### Market Layer
 
-Uniswap V2 uses the constant-product invariant:
+Responsible for maintaining normalized market observations.
 
-```text
-x × y = k
-```
+### Opportunity Layer
 
----
+Responsible for identifying potentially profitable market differences.
 
-## Concentrated Liquidity
+### Strategy Layer
 
-Uniswap V3 allows liquidity providers to specify the price ranges where their liquidity is active.
+Responsible for deciding how an opportunity could theoretically be exploited.
 
----
+### Execution Layer
 
-## Tick
+Responsible for modelling gas, slippage, and profitability.
 
-A tick is a discrete price boundary in Uniswap V3.
+### Evaluation Layer
 
-Crossing an initialized tick can change the active liquidity available to a swap.
+Responsible for measuring strategy performance.
+
 
 ---
 
-## MEV
+# Important Architectural Principle
 
-Maximal Extractable Value refers to value that can potentially be extracted by influencing transaction ordering or execution within blockchain blocks.
+The project deliberately separates:
 
----
+    Detection
+        ≠
+    Decision
+        ≠
+    Execution
 
-## Arbitrage
 
-Arbitrage involves buying an asset where it is cheaper and selling it where it is more expensive.
+Detection answers:
 
-In this project:
+    "Is there a potentially interesting market event?"
 
-```text
-Pool A
-  ↓
-Buy
-  ↓
-Asset
-  ↓
-Sell
-  ↓
-Pool B
-```
 
----
+Decision answers:
 
-# Current Limitations
+    "Is there a strategy worth considering?"
 
-The current system is a research and detection engine rather than a production trading bot.
 
-It does not currently perform:
+Execution simulation answers:
 
-* Live transaction submission
-* Private transaction submission
-* Flash-loan execution
-* Bundle submission
-* Mempool-based front-running
-* Guaranteed execution
-* Live capital deployment
+    "Would the strategy actually be profitable after costs?"
 
-The opportunity detector identifies candidate opportunities, while profitability and execution remain separate layers.
+
+This separation makes the system easier to test and extend.
+
 
 ---
 
-# Roadmap
+# Current Capabilities
 
-## Milestone 11 — Execution-Aware Opportunity Engine
+The engine can now:
 
-The next stage is to move beyond simply detecting price spreads.
+- Connect to Ethereum
+- Inspect real blocks
+- Inspect transaction receipts
+- Decode Uniswap V2 swaps
+- Decode Uniswap V3 swaps
+- Maintain normalized swap observations
+- Model Uniswap V2 liquidity
+- Model Uniswap V3 concentrated liquidity
+- Simulate V3 swaps
+- Compare multiple pools
+- Detect cross-pool price differences
+- Detect potential arbitrage opportunities
+- Simulate MEV strategies
+- Model gas costs
+- Calculate gross profit
+- Calculate net profit
+- Determine theoretical profitability
+- Process blocks in a production-style pipeline
+- Process real-time Ethereum data
+- Maintain persistent market state
+- Measure pipeline latency
+- Handle processing failures
 
-Planned work:
-
-```text
-Opportunity
-     ↓
-Trade Size Optimization
-     ↓
-V2 / V3 Swap Simulation
-     ↓
-Price Impact
-     ↓
-DEX Fees
-     ↓
-Gas Cost
-     ↓
-Net Profit
-     ↓
-Execution Decision
-```
-
-The goal is to determine whether a detected opportunity is actually profitable at a specific trade size.
 
 ---
 
-## Future Milestones
+# What This Project Does NOT Do
 
-### Mempool Intelligence
+This project intentionally does not:
 
-* Pending transaction monitoring
-* Mempool swap detection
-* Pending-state simulation
-* Front-run / back-run candidate detection
+- Sign real transactions
+- Store private keys
+- Broadcast transactions
+- Execute trades on mainnet
+- Control transaction ordering
+- Operate a production trading bot
+- Guarantee profitability
+- Guarantee execution
 
-### Advanced Arbitrage
+The execution layer is a simulation and research environment.
 
-* Multi-hop arbitrage
-* Multi-pool routing
-* More DEX integrations
-* V3 multi-tick state reconstruction
-* Dynamic trade-size optimization
 
-### Execution Infrastructure
+---
 
-* Transaction construction
-* Nonce management
-* Gas strategy
-* Private transaction submission
-* Bundle simulation
-* Execution monitoring
+# Configuration
 
-### Research & Analytics
+The Ethereum RPC endpoint is loaded from the environment.
 
-* Historical opportunity backtesting
-* Opportunity database
-* PnL analytics
-* Latency analysis
-* Failure analysis
-* Market microstructure research
+Create a `.env` file:
+
+    ETH_RPC_URL=YOUR_ETHEREUM_RPC_URL
+
+
+The project expects a working Ethereum RPC provider.
+
+Do not commit private credentials or API keys to GitHub.
+
+
+---
+
+# Research Direction
+
+Although the core implementation is complete as an educational MEV engine, several areas could be explored further.
+
+Possible extensions include:
+
+- Historical backtesting
+- More DEX integrations
+- Uniswap V3 multi-pool routing
+- Curve integration
+- Balancer integration
+- Flash-loan modelling
+- More sophisticated gas estimation
+- Priority-fee modelling
+- Builder/relay simulation
+- Transaction bundle simulation
+- Reorg handling
+- Mempool monitoring
+- Historical opportunity databases
+- Statistical strategy evaluation
+- Machine-learning-based opportunity ranking
+
+
+---
+
+# Final Architecture
+
+The complete project can be viewed as:
+
+    ┌─────────────────────────────────────────┐
+    │              Ethereum                   │
+    │                                         │
+    │ Blocks / Transactions / Logs / State    │
+    └────────────────────┬────────────────────┘
+                         │
+                         ▼
+    ┌─────────────────────────────────────────┐
+    │          Blockchain Client              │
+    └────────────────────┬────────────────────┘
+                         │
+                         ▼
+    ┌─────────────────────────────────────────┐
+    │          Block Stream / Scanner          │
+    └────────────────────┬────────────────────┘
+                         │
+                         ▼
+    ┌─────────────────────────────────────────┐
+    │            Swap Detection               │
+    │                                         │
+    │        V2 Events / V3 Events            │
+    └────────────────────┬────────────────────┘
+                         │
+                         ▼
+    ┌─────────────────────────────────────────┐
+    │            Market State                 │
+    │                                         │
+    │ Pools / Prices / Liquidity / Swaps      │
+    └────────────────────┬────────────────────┘
+                         │
+                         ▼
+    ┌─────────────────────────────────────────┐
+    │        Opportunity Detection            │
+    │                                         │
+    │     Spread / Arbitrage / Candidates     │
+    └────────────────────┬────────────────────┘
+                         │
+                         ▼
+    ┌─────────────────────────────────────────┐
+    │            Strategy Layer               │
+    │                                         │
+    │ Arbitrage / Sandwich / Other Strategies │
+    └────────────────────┬────────────────────┘
+                         │
+                         ▼
+    ┌─────────────────────────────────────────┐
+    │         Execution Simulation            │
+    │                                         │
+    │ Slippage / Gas / Gross / Net Profit     │
+    └────────────────────┬────────────────────┘
+                         │
+                         ▼
+    ┌─────────────────────────────────────────┐
+    │         Strategy Evaluation             │
+    │                                         │
+    │ Backtesting / Statistics / Performance  │
+    └─────────────────────────────────────────┘
+
+
+---
+
+# Lessons From the Project
+
+The project demonstrates several important ideas behind real MEV infrastructure:
+
+1. Blockchain data must first be normalized before it can be analyzed.
+
+2. Detecting a swap does not mean an MEV opportunity exists.
+
+3. Detecting a price difference does not mean the trade is profitable.
+
+4. Gas costs can eliminate apparently profitable opportunities.
+
+5. Slippage and liquidity matter when estimating execution.
+
+6. Strategy logic should remain separate from blockchain infrastructure.
+
+7. Execution should be simulated before any real transaction is considered.
+
+8. Testing every layer independently makes complex systems easier to reason about.
+
+9. Real-time systems require state management, failure handling, and latency measurement in addition to financial logic.
+
+10. A complete MEV engine is not simply an arbitrage formula; it is a pipeline connecting blockchain data, market state, opportunity detection, strategy selection, and execution modelling.
+
+
+---
+
+# Final Status
+
+This repository represents a complete educational MEV research pipeline built progressively from first principles.
+
+The project evolved through:
+
+    AMM Mathematics
+          ↓
+    Arbitrage
+          ↓
+    Ethereum
+          ↓
+    Uniswap
+          ↓
+    V3 Mathematics
+          ↓
+    Cross-Pool Arbitrage
+          ↓
+    MEV Detection
+          ↓
+    Production Processing
+          ↓
+    Real-Time Processing
+          ↓
+    Opportunity Detection
+          ↓
+    Strategy Simulation
+          ↓
+    Execution Modelling
+          ↓
+    Strategy Evaluation
+
 
 ---
 
@@ -1033,19 +1105,4 @@ This is an educational and research project.
 
 It is not intended to execute trades or interact with mainnet funds.
 
-Detected MEV opportunities are not guaranteed to be executable or profitable.
-
-Actual profitability depends on:
-
-* Pool state
-* Trade size
-* Liquidity
-* Price impact
-* DEX fees
-* Slippage
-* Gas costs
-* Transaction ordering
-* Block inclusion
-* Competition
-* Network conditions
-* Execution latency
+No private keys are required by the project, and the execution layer is designed for local simulation rather than real transaction broadcasting.
