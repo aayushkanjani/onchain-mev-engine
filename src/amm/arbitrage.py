@@ -7,8 +7,17 @@ from src.amm.v3.pool import V3Pool
 
 
 # ============================================================
+# TOKEN DECIMALS
+# ============================================================
+
+USDC_DECIMALS = 6
+WETH_DECIMALS = 18
+
+
+# ============================================================
 # V2 ↔ V2 ARBITRAGE
 # ============================================================
+
 
 @dataclass
 class ArbitrageResult:
@@ -30,21 +39,6 @@ def simulate_arbitrage(
     sell_pool: AMMPool,
     amount_in: float,
 ) -> ArbitrageResult:
-    """
-    Simulate a two-pool arbitrage.
-
-    We assume:
-
-        token_x -> token_y on buy_pool
-        token_y -> token_x on sell_pool
-
-    Example:
-
-        ETH -> USDC on pool A
-        USDC -> ETH on pool B
-
-    The pools are NOT modified.
-    """
 
     if amount_in <= 0:
         raise ValueError(
@@ -88,28 +82,47 @@ def simulate_arbitrage(
 # V2 → V3 ARBITRAGE
 # ============================================================
 
+
 @dataclass
 class V2V3ArbitrageResult:
-    amount_in: int
 
-    weth_bought: int
-    usdc_received: int
+    # Human-readable USDC amount
+    amount_in: float
 
-    v2_fee: int
-    v3_fee: int
+    # Human-readable WETH amount
+    weth_bought: float
 
-    gross_profit: int
-    net_profit: int
+    # Human-readable USDC amount
+    usdc_received: float
 
+    # Fees
+    v2_fee: float
+    v3_fee: float
+
+    # Profit
+    gross_profit: float
+
+    # Gas in USD
+    gas_cost: float
+
+    # Profit after gas
+    net_profit: float
+
+    profitable: bool
+
+    # Useful execution information
     v3_ticks_crossed: list[int]
 
 
 def simulate_v2_to_v3(
-    amount_in: int,
+    amount_in: float,
     v2_pool: AMMPool,
     v3_pool: V3Pool,
     usdc_token: str,
     weth_token: str,
+    gas_used: int = 250_000,
+    gas_price_gwei: float = 20.0,
+    eth_price: float = 2_500.0,
 ) -> V2V3ArbitrageResult:
     """
     Simulate:
@@ -117,19 +130,16 @@ def simulate_v2_to_v3(
         USDC -> WETH on V2
         WETH -> USDC on V3
 
-    V2:
-        Constant-product AMM.
+    Important:
 
-    V3:
-        Concentrated-liquidity swap engine using:
+    V2 AMMPool uses human-readable token amounts.
 
-        - sqrtPriceX96
-        - liquidity
-        - fee
-        - initialized ticks
-        - tick crossing
-        - liquidityNet
-        - price movement
+    V3Pool uses raw integer token amounts.
+
+    Therefore the boundary between V2 and V3 explicitly
+    performs decimal conversion.
+
+    This keeps the two engines internally consistent.
     """
 
     if amount_in <= 0:
@@ -141,29 +151,100 @@ def simulate_v2_to_v3(
     # LEG 1
     #
     # USDC -> WETH on V2
+    #
+    # V2 uses human-readable units.
     # ========================================================
 
-    weth_bought_float = v2_pool.get_amount_out(
+    weth_bought = v2_pool.get_amount_out(
         amount_in=amount_in,
         token_in=usdc_token,
     )
 
-    weth_bought = int(weth_bought_float)
-
-    v2_fee = int(
-        v2_pool.calculate_fee(amount_in)
+    v2_fee = v2_pool.calculate_fee(
+        amount_in
     )
 
     if weth_bought <= 0:
 
+        gas_cost_native = (
+            gas_used
+            * gas_price_gwei
+            / 1_000_000_000
+        )
+
+        gas_cost = (
+            gas_cost_native
+            * eth_price
+        )
+
+        gross_profit = -amount_in
+
+        net_profit = (
+            gross_profit
+            - gas_cost
+        )
+
         return V2V3ArbitrageResult(
             amount_in=amount_in,
-            weth_bought=0,
-            usdc_received=0,
+            weth_bought=0.0,
+            usdc_received=0.0,
             v2_fee=v2_fee,
-            v3_fee=0,
-            gross_profit=-amount_in,
-            net_profit=-amount_in,
+            v3_fee=0.0,
+            gross_profit=gross_profit,
+            gas_cost=gas_cost,
+            net_profit=net_profit,
+            profitable=False,
+            v3_ticks_crossed=[],
+        )
+
+    # ========================================================
+    # DECIMAL BOUNDARY
+    #
+    # Human WETH → raw WETH
+    #
+    # Example:
+    #
+    # 0.04 WETH
+    #
+    # becomes:
+    #
+    # 40,000,000,000,000,000
+    # ========================================================
+
+    weth_raw = int(
+        weth_bought * 10**WETH_DECIMALS
+    )
+
+    if weth_raw <= 0:
+
+        gas_cost_native = (
+            gas_used
+            * gas_price_gwei
+            / 1_000_000_000
+        )
+
+        gas_cost = (
+            gas_cost_native
+            * eth_price
+        )
+
+        gross_profit = -amount_in
+
+        net_profit = (
+            gross_profit
+            - gas_cost
+        )
+
+        return V2V3ArbitrageResult(
+            amount_in=amount_in,
+            weth_bought=weth_bought,
+            usdc_received=0.0,
+            v2_fee=v2_fee,
+            v3_fee=0.0,
+            gross_profit=gross_profit,
+            gas_cost=gas_cost,
+            net_profit=net_profit,
+            profitable=False,
             v3_ticks_crossed=[],
         )
 
@@ -171,6 +252,8 @@ def simulate_v2_to_v3(
     # LEG 2
     #
     # WETH -> USDC on V3
+    #
+    # Determine swap direction from token ordering.
     # ========================================================
 
     if weth_token.lower() == v3_pool.token0.lower():
@@ -189,30 +272,76 @@ def simulate_v2_to_v3(
             "WETH is not token0 or token1 of V3 pool"
         )
 
+    # ========================================================
+    # REAL V3 SWAP
+    # ========================================================
+
     v3_result = v3_pool.swap_exact_input(
-        amount_in=weth_bought,
+        amount_in=weth_raw,
         zero_for_one=zero_for_one,
     )
 
-    usdc_received = v3_result.amount_out
+    # V3 returns raw USDC.
+    usdc_received_raw = v3_result.amount_out
+
+    # Convert raw USDC → human-readable USDC.
+    usdc_received = (
+        usdc_received_raw
+        / 10**USDC_DECIMALS
+    )
+
+    # V3 fee is denominated in input token = WETH.
+    v3_fee_weth = (
+        v3_result.fee_amount
+        / 10**WETH_DECIMALS
+    )
 
     # ========================================================
     # PROFIT
     # ========================================================
 
     gross_profit = (
-        usdc_received - amount_in
+        usdc_received
+        - amount_in
     )
 
-    net_profit = gross_profit
+    # ========================================================
+    # GAS
+    # ========================================================
+
+    gas_cost_native = (
+        gas_used
+        * gas_price_gwei
+        / 1_000_000_000
+    )
+
+    gas_cost = (
+        gas_cost_native
+        * eth_price
+    )
+
+    # ========================================================
+    # NET PROFIT
+    # ========================================================
+
+    net_profit = (
+        gross_profit
+        - gas_cost
+    )
+
+    profitable = (
+        net_profit > 0
+    )
 
     return V2V3ArbitrageResult(
         amount_in=amount_in,
         weth_bought=weth_bought,
         usdc_received=usdc_received,
         v2_fee=v2_fee,
-        v3_fee=v3_result.fee_amount,
+        v3_fee=v3_fee_weth,
         gross_profit=gross_profit,
+        gas_cost=gas_cost,
         net_profit=net_profit,
+        profitable=profitable,
         v3_ticks_crossed=v3_result.ticks_crossed,
     )
